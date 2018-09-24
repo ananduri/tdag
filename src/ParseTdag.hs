@@ -5,7 +5,7 @@ module ParseTDAG where
 import Control.Applicative hiding ((<|>), many)
 
 import Text.Parsec
-import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec hiding (try)
 
 import TestData
 
@@ -38,45 +38,96 @@ p_word = many1 $ noneOf " ()"
 
 -- parse text. this will be the text part of the content of a node
 -- only constraint is, it should not contain round parens
+-- does this work with no content -> produce empty string?
 p_content :: Parsec String () String
 p_content = unwords <$> sepBy p_word p_sep
 
 
 -- parse an actual node sexp
-
--- can we factor out this pattern of alternating p_seps?
--- (the difference is, here what it's interweaved with is changing)
-
--- have to return an actual node data type now
+-- factor out this pattern of alternating p_seps?
+-- this should only work at the top level (where we need a "node" keyword)
 nodeParser :: Parsec String () Node
 nodeParser = do
   p_sep
-  char '(' *> p_node
+  char '(' *> string "node"
   p_sep
   id <- p_id
   p_sep
   content <- p_content <* char ')'
   bchild <- p_bchild
   return $ Node id content [] [bchild]
+  
 
 
 
+-- parse the inside of a node
+-- the inside consists of:
+-- content (which is always present, but could be empty (string)
+-- zero or more sexps (each of which could occur more than once).
+-- and the content and sexps could be in any order
+p_inside :: Parsec String () (Content, [SExp])
+p_inside = do
+  list1 <- many p_sexp
+  content <- p_content
+  list2 <- many p_sexp
+  return (content, [list1:list2])
+
+
+p_sexp :: Parsec String () SExp
+p_sexp = char '('
+      *> (try p_bchild <?> "Tried to parse BChild")
+     <|> (try p_props  <?> "Tried to parse Properties")
+     <|> (p_parent     <?> "Tried to parse Parent")
+      *> char ')'
+-- parsing SExp, a sum type, is creating confusion
+
+
+-- can you piece together datatypes using Applicatives?
+-- yeah, gotta use fmap and stuff      
+
+     
+
+p_parent = do
+  p_sep
+  string "parent"
+  p_sep
+  p_id
+
+p_props = do
+  p_sep
+  string "props"
+  p_sep
+  unwords <$> sepBy p_word p_sep
 
 -- parse a branch child (bchild) sexp
 -- this is the same as node, except the keyword is "bchild"
 -- these two need to be recursive, so yes you will need to parametrize node/bchild
-p_bchild :: Parsec String () Node
+p_bchild :: Parsec String () BChild
 p_bchild = do
   p_sep
-  char '(' *> string "node"
+  string "bchild"
   p_sep
-  id <- p_id   -- can we use the same variable name "id"?
+  id <- p_id
   p_sep
   content <- p_content <* char ')'
   return $ Node id content [] []
 
-  
 
+
+
+
+
+
+-- is this right? the marshalled repr is as an sexp, but the data are just other things
+-- i think it's right
+data SExp = BChild
+          | Properties
+          | ParentInfo
+
+
+type BChild = Node
+type ParentInfo = String -- contains the id of the parent node
+type Properties = String -- refactor to be a set of key-value pairs
 
 
 
