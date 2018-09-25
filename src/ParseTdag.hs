@@ -43,6 +43,9 @@ p_content :: Parsec String () String
 p_content = unwords <$> sepBy p_word p_sep
 
 
+
+
+
 -- parse an actual node sexp
 -- factor out this pattern of alternating p_seps?
 -- this should only work at the top level (where we need a "node" keyword)
@@ -57,7 +60,6 @@ nodeParser = do
   bchild <- p_bchild
   return $ Node id content [] [bchild]
   
-
 
 
 -- parse the inside of a node
@@ -91,7 +93,7 @@ p_parent = do
   p_sep
   string "parent"
   p_sep
-  p_id
+  ParentID <$> p_id
 
 p_props = do
   p_sep
@@ -102,7 +104,7 @@ p_props = do
 -- parse a branch child (bchild) sexp
 -- this is the same as node, except the keyword is "bchild"
 -- these two need to be recursive, so yes you will need to parametrize node/bchild
-p_bchild :: Parsec String () BChild
+p_bchild :: Parsec String () SExp
 p_bchild = do
   p_sep
   string "bchild"
@@ -110,26 +112,14 @@ p_bchild = do
   id <- p_id
   p_sep
   content <- p_content <* char ')'
-  return $ Node id content [] []
+  return $ BChild $ Node id content [] []
 
 
 
 
-
-
-
--- is this right? the marshalled repr is as an sexp, but the data are just other things
--- i think it's right
-data SExp = BChild
-          | Properties
-          | ParentInfo
-
-
-type BChild = Node
-type ParentInfo = String -- contains the id of the parent node
-type Properties = String -- refactor to be a set of key-value pairs
-
-
+data SExp = BChild Node
+          | ParentID String
+          | Properties String
 
 
 
