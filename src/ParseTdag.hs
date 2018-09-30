@@ -19,6 +19,21 @@ want to parse things like
 p_<thing> denotes a parser parsing some low-level object/token
 -}
 
+data SExp = BChild Node
+          | ParentID String
+          | Properties String
+
+-- define the node datatype here
+-- should the list of child and parent nodes be
+-- a list of ids, or a list of actual nodes?
+data Node = Node ID Content Properties [Node] [ID]
+  deriving Show
+
+type ID = String
+type Content = String
+type Properties = String
+
+
 -- whitespace separator. newlines don't matter
 p_sep :: Parsec String () String
 p_sep = many (char ' ' <|> char '\n')
@@ -43,16 +58,13 @@ p_content :: Parsec String () String
 p_content = unwords <$> sepBy p_word p_sep
 
 
-
-
-
 -- parse an actual node sexp
 -- factor out this pattern of alternating p_seps?
 -- this should only work at the top level (where we need a "node" keyword)
 nodeParser :: Parsec String () Node
 nodeParser = do
   p_sep
-  char '(' *> string "node"
+  char '(' *> p_node
   p_sep
   id <- p_id
   p_sep
@@ -60,8 +72,6 @@ nodeParser = do
   bchild <- p_bchild
   return $ Node id content [] [bchild]
   
-
-
 -- parse the inside of a node
 -- the inside consists of:
 -- content (which is always present, but could be empty (string)
@@ -72,34 +82,28 @@ p_inside = do
   list1 <- many p_sexp
   content <- p_content
   list2 <- many p_sexp
-  return (content, [list1:list2])
-
+  return (content, list1 ++ list2)
 
 p_sexp :: Parsec String () SExp
 p_sexp = char '('
       *> (try p_bchild <?> "Tried to parse BChild")
      <|> (try p_props  <?> "Tried to parse Properties")
      <|> (p_parent     <?> "Tried to parse Parent")
-      *> char ')'
--- parsing SExp, a sum type, is creating confusion
-
-
--- can you piece together datatypes using Applicatives?
--- yeah, gotta use fmap and stuff      
-
+     <*  char ')'
      
-
+p_parent :: Parsec String () SExp
 p_parent = do
   p_sep
   string "parent"
   p_sep
   ParentID <$> p_id
 
+p_props :: Parsec String () SExp
 p_props = do
   p_sep
   string "props"
   p_sep
-  unwords <$> sepBy p_word p_sep
+  Properties <$> unwords <$> sepBy p_word p_sep
 
 -- parse a branch child (bchild) sexp
 -- this is the same as node, except the keyword is "bchild"
@@ -114,21 +118,14 @@ p_bchild = do
   content <- p_content <* char ')'
   return $ BChild $ Node id content [] []
 
-
-
-
-data SExp = BChild Node
-          | ParentID String
-          | Properties String
-
-
-
--- define the node datatype here
--- should the list of child and parent nodes be
--- a list of ids, or a list of actual nodes?
-data Node = Node ID Content [Node] [Node]
-  deriving Show
-
-type ID = String
-type Content = String
-
+-- everything in ps has to be of the same type (although it can be a sum type)
+{-
+whitespaceInv :: (Stream s m t) => [ParsecT s u m a] -> ParsecT s u m a -> [a]
+whitespaceInv ps p_whitespace = do
+  case ps of
+    [] -> return []
+    p:ps -> do
+      p_whitespace
+      x <- p
+      return x ++ whitespaceInv ps p_whitespace
+-}

@@ -31,11 +31,11 @@ virtuousFraction = do
     0 -> fail "denom is 0"
     _ -> return (numerator % denominator)
 
-
 getInt :: Parser Integer
 getInt = do
   int <- integer
   return int
+
 
 type NumberOrString = Either Integer String
 

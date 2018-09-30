@@ -28,7 +28,6 @@ test2 = [r|
   What is memory?))
 |]
 
-
   
 test3 :: String
 test3 = [r|
