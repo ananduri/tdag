@@ -94,3 +94,15 @@
       )))
 
 
+
+;; syntax highlighting, not working yet.
+;; currently it thinks this is a different mode
+(require 'generic-x)
+(define-generic-mode  
+  'tdag-mode          ;; name of the mode
+  '(";")              ;; comments delimiter
+  '()                 ;; keywords
+  '()                 ;; list of operators
+  '("\\.dag$")        ;; file extensions that trigger this mode
+  nil
+  "dag highlighting mode")
